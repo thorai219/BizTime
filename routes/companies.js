@@ -16,15 +16,15 @@ router.get("/", async (req, res, next) => {
  
 router.get("/:code", async (req, res, next) => {
   try{
-    const companyResult = await db.query(`SELECT code, name, description FROM companies WHERE code = $1`, [req.params.code])
-    console.log(companyResult)
+    const companyResult = await db.query(`SELECT comp_code, name, description FROM companies WHERE comp_code = $1`, [req.params.code])
     const invoiceResult = await db.query(`SELECT id FROM invoices WHERE comp_code = $1`, [req.params.code])
-    console.log(invoiceResult)
+    const industryResult = await db.query(`SELECT ind_code FROM hello WHERE comp_code = $1`, [req.params.code])
     if (companyResult.rows.length === 0) {
       throw new ExpressError(`No such company: ${code}`, 404)
     } else {
       const company = companyResult.rows[0];
       const invoice = invoiceResult.rows;
+      company.industry = industryResult.rows[0];
 
       company.invoice = invoice.map(item => item.id)
 
@@ -37,8 +37,8 @@ router.get("/:code", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try{
-    const query = `INSERT INTO companies (code, name, description)
-    VALUES ($1, $2, $3) RETURNING code, name, description`;
+    const query = `INSERT INTO companies (comp_code, name, description)
+    VALUES ($1, $2, $3) RETURNING comp_code, name, description`;
     const result = await db.query(query,
       [req.body.code, req.body.name, req.body.description]
     )
@@ -56,8 +56,8 @@ router.put("/:code", async (req, res, next) => {
     const result = await db.query(
           `UPDATE companies
            SET name=$1, description=$2
-           WHERE code = $3
-           RETURNING code, name, description`,
+           WHERE comp_code = $3
+           RETURNING comp_code, name, description`,
         [name, description, code]);
 
     if (result.rows.length === 0) {
@@ -73,7 +73,7 @@ router.put("/:code", async (req, res, next) => {
 router.delete("/:code", async (req, res, next) => {
   try {
     const result = await db.query(
-      `DELETE FROM companies WHERE code = '${req.params.code}'`
+      `DELETE FROM companies WHERE comp_code = '${req.params.code}'`
     )    
     if (result.rows.length === 0) {
       throw new ExpressError(`No such company: ${code}`, 404)
@@ -84,5 +84,23 @@ router.delete("/:code", async (req, res, next) => {
     return next(e)
   }
 })
+
+// =========
+// associating an industry to a company
+// =========
+
+router.post("/add/industry", async (req, res, next) => {
+  try {
+    const result = await db.query(`INSERT INTO hello (comp_code, ind_code)
+    VALUES ($1, $2) RETURNING comp_code, ind_code;`
+    , [req.body.comp_code, req.body.ind_code]);
+    return res.json({"company" : result.rows[0]})
+  } catch (e) {
+    return next(e)
+  }
+
+})
+
+
 
 module.exports = router;
